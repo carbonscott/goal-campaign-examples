@@ -1,0 +1,292 @@
+{
+  "_meta": {
+    "slug": "srsvd-ooc-throughput",
+    "contract": ".goal/srsvd-ooc-throughput.json",
+    "bootstrapped": "2026-08-17T00:05:34+00:00",
+    "last_worked": "iteration 18 (iteration 19 in flight)",
+    "rule": "Every fact carries VERIFIED (this campaign observed it first-hand and printed the observation) or INHERITED (carried from a finished campaign's record or from the authoring conversation's read-only probes of 2026-08-16). Bootstrapped facts are INHERITED by construction. Promote only in the iteration you re-observe; correct in place naming the correction in that iteration's ledger entry; fill every slot beginning `TO BE FILLED`. Print the roster (key \u2014 n facts, v VERIFIED / i INHERITED) at the end of every turn.",
+    "sources": [
+      ".goal/srsvd-whole-job.setup.json (S)",
+      ".goal/srsvd-whole-job.claims.json (C)",
+      ".ai/research/srsvd-whole-job-utilization-audit.json (A)",
+      "read-only ssh probes of sdfiana025 on 2026-08-16",
+      "read-only inspection of work/srsvd-jax and work/srsvd-jax-bench at whole-job",
+      "read-only inspection of /home/exedev/software/jax at 84c9fc2d94",
+      "iteration 1 first-hand measurements on Slurm job 35176504 / sdfada015 (2026-08-17)"
+    ]
+  },
+  "metric_and_harness": {
+    "definition_H1": "VERIFIED (orchestrator read src/srsvd_jax/steady.py at 66e15d4 himself). STEADY5_GB = store bytes of blocks whose device result was confirmed ready between window_open and window_close, normalised to exactly 300 s (bytes x 300 / span). window_open = first block confirmation after warm-up AND >= 32 blocks streamed; window_close = first block confirmation at or after window_open + 300.0 s; both instants are a block_until_ready on every outstanding block; span must lie in [300.0, 302.0]. If the job completes inside the window the next identical job starts IMMEDIATELY in the same process (same reader, same pool, no re-pin, same compiled executables); the process runs until the window has closed AND >= 1 full job has completed with its gate printed. compiles_in_window must be 0. FROZEN at H1.",
+    "record_eligibility": "INHERITED from the contract. fixed store on /lscratch; ONE L40S by UUID with CUDA_VISIBLE_DEVICES printed, ECC clean; mode direct; k=32 p=10 q=2 seed 0 (3 passes); gate PASS (G1 1e-4, G2 1e-3, G3 1e-2, G4 5e-2 two-sided) on >= 1 complete job in-process; compiles_in_window == 0; unprofiled; both installed SHAs printed from inside the job and equal to the claimed commits; harness H1; same-iteration champion control; margin > noise floor and >= 1 pct. Numerics-affecting (wire dtype, matmul precision, accumulation dtype) eligible if the gate passes, labelled. Never eligible: fewer passes / changed q,k,p; any dtype ON DISK; buffered / page cache; > 1 card; another tier; profiled.",
+    "harness_source_commit": "VERIFIED. srsvd-jax ooc-throughput 66e15d4b91f105fd3ecd4db67a30c885a3a19879 (base 9a1f214; new src/srsvd_jax/steady.py 325 lines + stream.py wiring, 806 insertions). srsvd-jax-bench ooc-throughput f85c37c6e8d386aa5890cb094b2a6e115afe402e (two commits: 33a9952 then f85c37c; base 67d94db; cli.py +695/+16 lines). Both pushed; main and whole-job untouched; nothing force-pushed. Patches at work/iter01-H1-srsvd-jax.patch and work/iter01-H1-srsvd-jax-bench.patch.",
+    "harness_design_decisions_H1": "VERIFIED by source read. (D1) every block carries a process-global monotone seq and its byte count; SteadyWindow keeps a pending deque and folds it on confirm, so counting is exact to the block and the open/close drains cannot double count. (D2) the warm-up runs on JOB 1 ONLY; jobs 2+ reuse a warm session and skip it, because the warm-up exists only to move COMPILATION out of the measured region. (D2b, found by the implementer and not in the brief) core.make_step returns a NEW closure per call and jax keys its caches on the function object, so the jitted step is SESSION STATE -- without hoisting it, job 2 would recompile inside the window. (D3) the hot path adds one integer increment and one deque append per block; the only added host syncs in the whole process are the two _drain calls at open and close, charged to sync site 'steady:window'. (D4) with steady=None every line is whole-job HEAD's behaviour.",
+    "harness_proofs": "VERIFIED on CPU by the implementer, and on the real store by the runner (iteration 1). CPU: span 8.001886 s in [8,10]; RECONCILE=OK with an independent tally (3380 blocks / 14176747520 bytes, seq [34,3413] contiguous); ragged geometry hand-checked (846*4096000 + 13*2195456 = 3493756928 exactly); SRSVD_WARMUP_SKIP -> compiles_in_window=4, 0.089743 s, fun_names named, exit 4; without it compiles_in_window=0, exit 0; 17 in-process restarts inside the window with warmup_skipped True on jobs 2+ and no re-pin. On-store proofs: see origin_and_record.harness_proofs_on_store.",
+    "roof_arithmetic_THIS_NODE": "VERIFIED from this node's own floors (iteration 1). PCIe pinned 26.68 GB/s x 300 s = 8004 GB per window (one card, f32 on the wire) -- THE ONE-CARD ROOF. PCIe pageable 23.61 x 300 = 7083 GB. /lscratch reader plateau 36.64 GB/s x 300 s = 10992 GB (binds once wire bytes are halved). These REPLACE the inherited projections of 8.08 TB and 11.7 TB, which were computed on sdfada008's faster media."
+  },
+  "origin_and_record": {
+    "origin_definition": "VERIFIED. whole-job HEAD (srsvd-jax 9a1f214, srsvd-jax-bench 67d94db) plus H1 only = lib 66e15d4 + bench f85c37c; flags --block-rows 8192 --threads 16 --mode direct --sync-mode deferred --depth 2 --h2d device_put --k 32 --p 10 --q 2 --seed 0, no readahead, default matmul precision, chunks 1, read_chunk_bytes 8388608; ONE L40S GPU-a1746c8f-803d-04b4-fa54-01c28d81467e; >= 3 fresh processes.",
+    "previous_best_on_this_store_INHERITED": "whole-job ARM-BIGGER baseline: 327.9526 / 328.3703 / 327.9584 s end-to-end (median 327.9584, spread 0.127 pct), 4,638,564,679,680 B over 3 passes at effective 14.144 GB/s, node sdfada008 job 35042336. NOT a STEADY5 number and measured on a DIFFERENT node with faster media; it is a projection here, not a record.",
+    "origin_STEADY5_GB_median": "VERIFIED. 4069.478213 GB (13.564927 GB/s), the MEDIAN of three fresh processes under H1 on GPU-a1746c8f-803d-04b4-fa54-01c28d81467e, job 35176504/sdfada015: 4405.946807 / 4039.636815 / 4069.478213. This is THE RECORD TO BEAT.",
+    "noise_floor": "VERIFIED, AND IT IS A PROPERTY OF THE CONFIGURATION AND THE HOUR. Origin (unpinned, 3 fresh processes, iteration 1): 9.0014 pct, all of it in step_issue and none in the reader. Origin repeated inside one iteration (iteration 2): 4.036 pct. Pinned champion, n=2 inside one iteration (iteration 3): 0.0812 pct -- TOO SMALL A SAMPLE, and I wrongly wrote +-0.1 pct prediction bands from it. Pinned bf16 champion, n=5 back-to-back (iteration 5): 0.6319 pct (median 7138.199539, min 7124.925978, max 7170.030206). Stable, not drifting, not bimodal. THIS IS THE CAMPAIGN'S NOISE FLOOR. SEPARATELY, THE BASELINE ITSELF MOVES BETWEEN HOURS: the same champion command measured 9890.776 (iteration 3), 9738.621 (iteration 4 start), 7158.282 (iteration 4 end) and 7138.199 (iteration 5 median). The iteration-4 step of -26.4959 pct is 42x the n=5 floor and is NOT run-to-run noise; it is diagnosed under hardware.HOST_READ_REGRESSION. FAST-REGIME FLOOR, VERIFIED AT n=5 IN ITERATION 17: 0.2196 pct (five consecutive unchanged champion rows under numactl --interleave=all, median 10206.615573, min 10197.936427, max 10220.351880), 2.88x TIGHTER than the slow-regime 0.6319 pct. Median within-process read spread 0.1674 pct, so most of the floor is within-process jitter. THIS IS THE FLOOR EVERY POST-ITERATION-17 MARGIN IS JUDGED AGAINST. The 37x range of n=2 fast-regime control brackets (0.042 pct iter16 to 1.574 pct iter13) was tail sampling, not resolving power.",
+    "harness_proofs_on_store": "PARTIALLY VERIFIED on the real 1.546 TB store. (a) BYTES RECONCILE: blocks_consumed x 1073741824 == bytes_consumed to the byte on every row (4104/3763/3791/808/824/740). (b) SPAN IN BAND: 300.046957 / 300.063397 / 300.079399 at window_s 300, and 60.070713 / 60.066042 / 60.032961 at window_s 60. (c) WATCHDOG ACCEPT: compiles_in_window 0 and compiles_in_wall 0, exit 0. (c') WATCHDOG REJECT: OUTSTANDING -- SRSVD_WARMUP_SKIP at a 60 s window did NOT fire, because the 4 deferred compiles (jit(step) 0.313 s, jit(concatenate) 0.988 s, jit(transpose), jit(matmul); 1.883 s total) happen at the pass boundary block 1440 and the window closed at block 841; the job's own compiles_in_wall WAS 4, so the mechanism works and only the window length was wrong. Re-queued at >= 150 s. (d) IN-PROCESS RESTART: PROVEN -- 2 jobs completed inside a 60 s window (3 total), warmup_skipped True on jobs 2-3, compiles_in_window 0, no re-pin, job walls 30.83/30.99/30.88 s.",
+    "champion_history": [
+      {
+        "iteration": 1,
+        "candidate_id": "origin",
+        "lib_sha": "66e15d4b91f105fd3ecd4db67a30c885a3a19879",
+        "bench_sha": "f85c37c6e8d386aa5890cb094b2a6e115afe402e",
+        "flags": "--block-rows 8192 --threads 16 --mode direct --sync-mode deferred --depth 2 --h2d device_put --k 32 --p 10 --q 2 --seed 0 --min-intensity 0 --steady-window-s 300",
+        "STEADY5_GB": 4069.478213,
+        "control": "n/a (this IS the origin)",
+        "margin": "n/a",
+        "run_id": "35176504/sdfada015/GPU-a1746c8f",
+        "note": "median of 3 fresh processes; noise floor 9.00 pct"
+      },
+      {
+        "iteration": 2,
+        "candidate_id": "c2b-register",
+        "lib_sha": "66e15d4b91f105fd3ecd4db67a30c885a3a19879",
+        "bench_sha": "f85c37c6e8d386aa5890cb094b2a6e115afe402e",
+        "flags": "...as origin but --h2d register",
+        "STEADY5_GB": 6729.31343,
+        "control": 4246.413631,
+        "margin": "+58.470 pct (floor 9.00 pct)",
+        "run_id": "35176504/sdfada015/GPU-a1746c8f",
+        "note": "flag-only. step_issue 198.918 -> 0.901 s proves the origin paid a synchronous host staging copy. 1.585x its control"
+      },
+      {
+        "iteration": 3,
+        "candidate_id": "c3a-bf16",
+        "lib_sha": "38be495266b853f6be3f550bf0e5f5a7ed6072b3",
+        "bench_sha": "b051d96f262fbfd30dc4eca1dc857f59fb12b5ab",
+        "flags": "...as c2b but --wire-dtype bfloat16",
+        "STEADY5_GB": 9890.775672,
+        "control": 6727.283413,
+        "margin": "+47.028 pct (floor 0.0812 pct)",
+        "run_id": "35176504/sdfada015/GPU-a1746c8f",
+        "note": "numerics-affecting, gate PASS all four BINDING, G3 binding at 4.8x headroom. 1.470x its control; 2.430x the origin. Neutrality of the new code proved separately by control-newcode at -0.039 pct"
+      },
+      {
+        "iteration": 7,
+        "candidate_id": "c7b-convert4",
+        "lib_sha": "ce84d803a8c4efb9791eeee6da256886c0baf93f",
+        "bench_sha": "fb41d16bbf46675188ec9b1641401083d2f7056d",
+        "flags": "...as c3a-bf16 plus --convert-threads 4",
+        "STEADY5_GB": 9909.201421,
+        "control": 7096.592202,
+        "margin": "+39.633 pct (floor 0.6319 pct, 63x)",
+        "run_id": "35176504/sdfada015/GPU-a1746c8f",
+        "note": "numerics-affecting (bf16 wire). 2.435x the origin, 90.1 pct of the 10992 GB read roof. Beats the PREVIOUS RECORD c3a-bf16 9890.776 by only +0.19 pct, BELOW the floor -- the record moves on the same-iteration control, and the honest description is that it RECOVERS iteration 3's throughput under today's host conditions from a code path that no longer needs the reader threads to have spare CPU. n=1; replication is iteration 8's first job | DEMOTED IN ITERATION 8: three spread repeats give 7115.62/7129.57/7116.65, -28.19 pct from the record; --convert-threads is a NULL and the margin was mode luck. Champion reverted to c3a-bf16."
+      },
+      {
+        "iteration": 12,
+        "candidate_id": "c12-convert4",
+        "lib_sha": "ce84d803a8c4efb9791eeee6da256886c0baf93f",
+        "bench_sha": "fb41d16bbf46675188ec9b1641401083d2f7056d",
+        "flags": "numactl --interleave=all + --block-rows 8192 --threads 16 --mode direct --sync-mode deferred --depth 2 --h2d register --wire-dtype bfloat16 --read-chunk-bytes 8388608 --convert-threads 4 --k 32 --p 10 --q 2 --seed 0 --min-intensity 0",
+        "STEADY5_GB": 10145.939,
+        "control": 9876.9415,
+        "margin": "+2.723 pct (floor 0.6319 pct, 4.3x)",
+        "run_id": "35176504/sdfada015/GPU-a1746c8f",
+        "note": "numerics-affecting (bf16 wire). REPLICATED: 10123.790/10145.939/10158.192 spread 0.339 pct, and 4 rows across iterations 11-12 spanning 0.514 pct. 2.493x the origin, 92.3 pct of the read roof. First coronation of the campaign to survive its own replication test"
+      },
+      {
+        "iteration": 14,
+        "candidate_id": "c14-convert8",
+        "lib_sha": "ce84d803a8c4efb9791eeee6da256886c0baf93f",
+        "bench_sha": "fb41d16bbf46675188ec9b1641401083d2f7056d",
+        "flags": "numactl --interleave=all + --block-rows 8192 --threads 16 --mode direct --sync-mode deferred --depth 2 --h2d register --wire-dtype bfloat16 --read-chunk-bytes 8388608 --convert-threads 8 --k 32 --p 10 --q 2 --seed 0 --min-intensity 0",
+        "STEADY5_GB": 10250.668,
+        "control": 9960.131,
+        "margin": "+2.917 pct (floor 0.6319 pct, 4.6x)",
+        "run_id": "35176504/sdfada015/GPU-a1746c8f",
+        "note": "numerics-affecting (bf16 wire). REPLICATED n=4 across iterations 13-14, spread 0.404 pct. 2.519x the origin, 93.3 pct of the read roof. Crowned at 8 because it is the replicated point; 10 and 12 are statistically indistinguishable"
+      },
+      {
+        "iteration": 18,
+        "candidate_id": "b18-d4s4",
+        "lib_sha": "ce84d803a8c4efb9791eeee6da256886c0baf93f",
+        "bench_sha": "fb41d16bbf46675188ec9b1641401083d2f7056d",
+        "flags": "numactl --interleave=all + --block-rows 8192 --threads 16 --mode direct --sync-mode deferred --depth 4 --sync-every 4 --h2d register --wire-dtype bfloat16 --read-chunk-bytes 8388608 --convert-threads 8 --k 32 --p 10 --q 2 --seed 0 --min-intensity 0",
+        "STEADY5_GB": 10326.32634,
+        "control": 10203.732687,
+        "margin": "+1.2015 pct median-of-medians, +1.2809 pct mean-of-means, paired median +1.2772 pct (floor 0.2196 pct, 5.5x)",
+        "run_id": "35176504/sdfada015/GPU-a1746c8f",
+        "note": "numerics-affecting (bf16 wire). Established by strict alternation A/B/A/B/A/B; populations disjoint by 120 GB; both arm spreads below the floor; ARM A reproduces iteration 17's independent floor to 0.0282 pct across sessions. 2.538x the origin, 93.9 pct of the read roof. Costs 5.369 GB more host staging (nbuf 5 -> 10)"
+      }
+    ],
+    "positive_control": "INHERITED: --sync-mode lockstep was +44 pct slower on the 193 GB store (83.55 vs 58.03 s, S:749) \u2014 the known-working negative lever to prove the harness moves.",
+    "open_obligations": "SATISFIED as of iteration 10 for the champion CONFIGURATION: five rows across two iterations under numactl --interleave=all spanning 0.450 pct (9854.547536 / 9859.851000 / 9874.654290 / 9881.433265 / 9899.003617, median 9874.654290) inside the 0.6319 pct floor, and the band contains c3a-bf16's 9890.775672. OUTSTANDING: if --convert-threads 4 is crowned in iteration 12 it will need its own 3x reproduction."
+  },
+  "store": {
+    "spec": "VERIFIED. tall float32 (m=11796480, n=32768), rank 32, alpha 1.0, eps 1e-3, seed 0, ROW_BLOCK 512, layout tall; 1,546,188,226,688 B on disk (1,546,188,226,560 payload + 128 header); 23040 row blocks, 23040 pwrites.",
+    "CORRECTION_row_block": "VERIFIED CORRECTION (iteration 1). gen.py's docstring claims 'the store on disk is the same bytes whatever --row-block was'. THAT CLAIM IS FALSE: gen.py:195/198 key Philox on the block index (counter = 2*rb), so renumbering blocks renumbers every random stream. Measured: two 4096x1024 tall stores identical in every argument but --row-block gave the same size and DIFFERENT sha256 (51401b84... vs 67e8a2b3...). The campaign store needs --row-block 512 (armbig_meta.json records it). Running the default 8192 would have produced a different store.",
+    "CORRECTION_gen_flag": "VERIFIED CORRECTION. `gen` takes --path (cli.py:1118), not --out; --out belongs to the `reference` subcommand.",
+    "ratio_to_RealMemory": "VERIFIED. 1546188226688 / 753766760448 = 2.051282 (RealMemory 718848 MiB = 753766760448 B). 1.9071x against in-step MemTotal 791746000 kB.",
+    "survives": "NO \u2014 /lscratch is node-local; regenerate in every allocation.",
+    "analytic_reference": "VERIFIED. $W/stores/armbig_analytic_ref.npz, 8391947 B, sha256 d5cab8b32bb257e048afe81e621dde4dae99aa170f0bea6b82e631e1c00d2d4d; .json 617 B, sha256 4cb07fc5968f1984a996b1545accf5e42e30574a7e066af1663db0236b86c0e2. sigma_1 3438.7574135515165, sigma_k 107.61188719517416, sigma_k/sigma_1 0.03129382921025348, noise_floor 3.4346004134396773, fro2 19480216.086736657, ref_energy 19094046.517456654, orth_err 8.888998426215267e-10, m 11796480, n 32768, rank 32, seed 0, row_block 512. Copied with cp -p from $W_prev; source and dest hashes equal.",
+    "gate_on_this_store_INHERITED": "all four gates BIND and PASS on whole-job: G1 1.7159e-06, G2 1.0261e-05, G3 2.0544e-03, G4 8.785e-05, exit 0; degraded --q 0: exit 3, G4 4.4821e-01, rejected_by [G4].",
+    "ordering_survival_margin": "VERIFIED. generator banner printed MARGIN 18.399x at k=32, matching armbig_meta.json's 18.398706386434192 exactly \u2014 one of the three bit-identity corroborations.",
+    "regenerations_THIS_CAMPAIGN": {
+      "job_35176504_sdfada015": {
+        "provenance": "VERIFIED",
+        "path": "/lscratch/ooc/stores/armbig_tall_m11796480_n32768_r32_a1_seed0.npy",
+        "bytes": 1546188226688,
+        "gen_wall_s": 1293.005,
+        "gen_GBps": 1.196,
+        "threads": 32,
+        "row_block": 512,
+        "row_blocks": 23040,
+        "df_lscratch_in_allocation": "/dev/md0 xfs 21T, 1.6T used, 8 pct",
+        "slice_sha256": {
+          "head_off_128": "d47edcb6b0b2a9a8b875ae004ddb919890b8da9727526518e05519c4e751baee",
+          "middle_off_773094113408": "b592e8e237ba622f1b9a85e494b858520e59d7090de30113bfb270bfda1dcc45",
+          "tail_off_1545114484864": "4c8a6c78f774670acf8081b0680c3ed1564dbe3ba4f01635ae04258e0c449f14"
+        },
+        "slice_command": "dd if=<store> bs=1048576 iflag=skip_bytes,count_bytes skip=<OFF> count=1073741824 status=none | sha256sum",
+        "bit_identity_evidence": "INDIRECT (no prior slice hashes exist to compare against): exact byte count 1546188226688, row_blocks 23040 and ordering margin 18.399 all match armbig_meta.json. These three hashes are the fingerprint of record for every later regeneration."
+      }
+    }
+  },
+  "hardware": {
+    "node": "VERIFIED for sdfada015. ada partition, 19 nodes x 10 L40S; CPUTot=96, CPUAlloc=72, CPUEfctv=72; RealMemory=718848 MiB = 753766760448 B; in-step MemTotal 791746000 kB; driver 575.57.08; platform_version 'cuda 12090'; AMD 9454.",
+    "CORRECTION_cpuset": "VERIFIED CORRECTION. Slurm allocates cpu=72 and cpuset.cpus lists 72 CPUs (0-11,18-35,42-59,66-83,90-95), but cpuset.cpus.effective is only 58 (0-11,18-28,42-59,66-76,90-95) \u2014 14 allocated CPUs are OFFLINE at node level. nproc = 58. The inherited '58 usable' figure is right; the reason (offline CPUs, not CoreSpec) is now measured.",
+    "CORRECTION_mem0": "VERIFIED CORRECTION. `salloc --exclusive --mem=0` granted AllocTRES mem=702G (not the 288000M accounting figure whole-job saw without --mem=0). cgroup memory.max = 753766760448 B, carried at the JOB level (/sys/fs/cgroup/system.slice/slurmstepd.scope/job_35176504/memory.max); the step_0 and task_0 levels both read 'max'.",
+    "CORRECTION_lscratch_on_login_node": "VERIFIED CORRECTION, NEW TRAP. `df -Th /lscratch` run on the LOGIN node sdfiana025 reports /dev/mapper/vg_raid-lv_lscratch xfs 300G \u2014 a different filesystem entirely. The compute node's /lscratch is /dev/md0 xfs 21T. Any /lscratch capacity or bandwidth figure must be taken INSIDE the allocation or it is about the wrong device.",
+    "CORRECTION_node_clock": "VERIFIED CORRECTION. The compute node's clock runs 7 h behind the login node's UTC (sacct and the node say 2026-08-16T17:10:31 for what the login node calls 2026-08-17T00:10:31). Use epochs, never local time strings, when joining logs across hosts.",
+    "lscratch": "VERIFIED. /lscratch = /dev/md0 xfs, 21 TB, node-local, NOT Slurm-managed, dies with the job.",
+    "cards_sdfada015": {
+      "provenance": "VERIFIED",
+      "screen": "nvidia-smi over all ten cards; jax opened 9 of 10.",
+      "REFUSED": "index 9 GPU-163d23c0-bfcb-7af9-2aab-bb1e85693cfe \u2014 volatile uncorrectable ECC = 2, aggregate 6. jax independently confirmed: 'Failed to create stream executor for device CUDA:9: CUDA_ERROR_ECC_UNCORRECTABLE'; jax.devices() returned 9 devices.",
+      "flagged": "index 5 GPU-42025b2d-c00f-e329-6d37-fbc5e69a5b9a \u2014 volatile 0, aggregate 2. Passes the stated criterion (volatile only); flagged for the record.",
+      "precision_check": "all 9 survivors BIT-IDENTICAL: 4096x4096 float32 matmul, entries np.random.default_rng(0).standard_normal, vs numpy float64: relFrobErr default 2.941196e-04 (the TF32 signature), precision=highest 6.642742e-07. Each under CUDA_VISIBLE_DEVICES=GPU-<uuid> with len(jax.devices())==1.",
+      "throughput_probe": "200 jitted float32 GEMMs 8192x8192, 6 warmups: idx0 93.3297, idx1 94.9469, idx2 90.0951, idx3 93.1473, idx4 95.5975, idx5 92.9150, idx6 95.2515, idx7 94.8882, idx8 94.3739 TFLOPs.",
+      "CORRECTION_card_spread": "VERIFIED CORRECTION. Measured card-to-card spread is 6.11 pct (min 90.0951, max 95.5975), NOT the ~12 pct inherited. Caveat recorded by the runner: a compute-bound GEMM probe may not expose the spread a transfer probe would.",
+      "RECORD_CARD": "GPU-a1746c8f-803d-04b4-fa54-01c28d81467e (index 4, 95.5975 TFLOPs, ECC clean). Fixed by UUID for the life of allocation 35176504."
+    },
+    "cross_node_gap": "INHERITED 12.4 pct between sdfada012 and sdfada008, unexplained. THIS CAMPAIGN ADDS EVIDENCE: sdfada015's media is measurably slower than sdfada008's (reader 36.64 vs 39.005 GB/s at 1 GiB blocks; dd 33.44 vs 40.64-41.04 at 16 streams). Nodes are not interchangeable.",
+    "weka_daemon": "INHERITED: wekanode ~7.8 cores continuously even on an exclusive node. Node CPULoad was 104.85 during an otherwise idle step, consistent.",
+    "pcie_sdfada015": "VERIFIED, 1 GiB buffer, 25 repeats each. pageable (plain np.ndarray -> device_put): mean 23.6071, median 23.6717, min 22.6056, max 23.9490 GB/s. pinned via cudaHostRegister then device_put: mean 26.6777, median 26.6863, min 26.4886, max 26.7016 GB/s. pinned via jax memory_kind='pinned_host' then jit copy to 'device': mean 26.9071, median 26.9118 GB/s. pinned/pageable = 1.130x. D2H rate still NEVER measured.",
+    "hbm_sdfada015": "VERIFIED. 4 GiB arrays, 25 repeats: triad a = b + 3.0f*c (3x4 GiB counted) mean 664.801, median 664.970, min 661.553, max 666.606 GB/s; copy (2x4 GiB) mean 663.455, median 663.498 GB/s \u2014 ~77 pct of the L40S 864 GB/s spec. Never binds.",
+    "allocations_THIS_CAMPAIGN": {
+      "35176504": {
+        "provenance": "VERIFIED",
+        "node": "sdfada015",
+        "salloc": "nohup setsid salloc --no-shell --job-name=ooc --account=lcls:prjdat21 --qos=normal --partition=ada --exclusive --mem=0 --time=48:00:00 & (issued by the orchestrator from sdfiana025; salloc.out holds only salloc's stderr, so the flags are recovered from this record and from sacct)",
+        "queue_wait_s": 46,
+        "submit": "2026-08-16T17:09:45 node-local (2026-08-17T00:09:45 login UTC)",
+        "start": "2026-08-16T17:10:31 node-local",
+        "AllocTRES": "billing=72,cpu=72,gres/gpu=10,mem=702G,node=1",
+        "OverSubscribe": "NO (exclusive)",
+        "cgroup_memory_max": 753766760448,
+        "in_job_versions": "jax 0.11.0, jaxlib 0.11.0, jax-cuda12-pjrt 0.11.0, jax-cuda12-plugin 0.11.0, ml-dtypes 0.6.0, numpy 2.5.2, scipy 1.18.0, python 3.12.12; jax.default_backend() == 'gpu'; driver 575.57.08; cuda 12090",
+        "record_card": "GPU-a1746c8f-803d-04b4-fa54-01c28d81467e"
+      }
+    },
+    "HOST_READ_REGRESSION_iteration_4": "RESOLVED IN ITERATION 7, AND IT WAS NOT A HARDWARE REGRESSION. The phenomenon: between two byte-identical champion runs 47 minutes apart the in-pipeline /lscratch read fell 33.773 -> 24.402 GB/s as a STEP and never recovered. SEVEN CAUSES REFUTED BY MEASUREMENT: NVMe thermal/device state (12 min proven idle changed nothing; raw dd 12 pct FASTER than iteration 1); the reader or pool machinery (the same library's standalone probe reads 36.88 in the same hour); other tenants (constant load, zero writes, all six members within 0.04 pct); huge pages (cliff sweep flat across a 16x pool-size change, and the pools were never THP-eligible); pool size; cudaHostRegister pinning; a live CUDA context (the last three tie to within 0.60 pct, inside the noise floor). THE CAUSE: the in-thread f32->bf16 cast. Iteration 7's c7a-wire-f32 -- the champion pipeline with the cast switched off, same GPU consumer, same PCIe DMA, same pools -- reads 35.410523 GB/s against the control mean 24.305784, +45.6876 pct, closing the probe-versus-pipeline gap from 12.5 GB/s to 1.4. The cast's cost rose from +4.24 pct of the read in iteration 3 to +45.7 pct, because it runs inside the reader worker threads on a node whose usable CPU is contended by seven root wekanode processes pegged at 100 pct. THE FIX: --convert-threads 4, which restores the read to 34.239527 GB/s and took the record to 9909.201421 GB.",
+    "node_is_not_exclusive_in_practice": "VERIFIED (iteration 5). Despite --exclusive and OverSubscribe=NO, eleven root-owned wekanode processes run continuously, seven of them pegged at 100-101 pct CPU and hard-pinned to single cpus (pids 8645->cpu32, 8646->cpu33, others psr 29/30/31/34/35), plus four more at 29.0/24.8/16.0/11.1 pct. loadavg 12.24/14.41/18.47 with our job idle. squeue -w sdfada015 shows only our job. nproc 58 vs SLURM_CPUS_ON_NODE 72. This is a constant background, not a confound between rows, but it is why host-side CPU headroom is smaller than the cpuset suggests.",
+    "NUMA_REGIME": "VERIFIED (iterations 8-9), THE CAMPAIGN'S DOMINANT NON-DETERMINISM. A per-process fast/slow read regime (~30-35 vs ~24.3-24.5 GB/s) is chosen at process start and held for the process's life; every job within a run agrees and mode membership does not track the configuration. CAUSE: NUMA page placement. Free memory at an iteration-9 launch was 25089 / 2878 / 4415 / 6274 MB on nodes 0/1/2/3 of ~193 GB each, so default local allocation puts the 5368750080 B staging pool on whichever node the touching thread is on and three of four are starved. numactl --interleave=all reaches the fast regime on demand: 9874.654290 GB, read 34.225764 GB/s, +38.016 pct over a three-control bracket that agreed to 0.2064 pct, with the pool residency flag OFF so the gain is placement not residency. n=1 as of iteration 9; iteration 10 replicates. THIS IS WHY every iteration from 9 onward carries THREE controls and spreads candidate repeats across the iteration. ITERATION 10 CORRECTION: interleave does NOT CAUSE the fast regime -- a default-placement control reached 9764.407 -- it HOLDS it. Interleave is fast 8/8 across iterations 9-11; default about 3/13; membind=0 0/1. The mechanism is SPREADING, not starvation-avoidance: node 0 is the only node with real free memory (25 GB vs 2.9/5.2/7.8) and binding the pool there is the SLOWEST configuration measured, at -27.37 pct, with 24 CPUs available inside the cpuset so it was not CPU-starved. One memory controller cannot feed 16 reader threads plus the PCIe DMA."
+  },
+  "storage_tiers": {
+    "table_THIS_CAMPAIGN": {
+      "provenance": "VERIFIED on sdfada015 with srsvd_jax.reader.BlockReader, mode=direct, chunk_bytes=8388608, threads=16, 1 GiB blocks",
+      "lscratch_reader_GBps": 36.6416,
+      "lscratch_reader_detail": "the real 1.55 TB store, block_rows=8192, first 512 blocks skipped so no page cache can help; 224.001 GiB in 6.564 s. Per-block median 37.42, max 38.62, min 6.48 (first block, cold).",
+      "lscratch_dd_direct_GBps": 33.4369,
+      "lscratch_dd_detail": "dd iflag=direct, 16 concurrent streams, 8 GiB each, bs 8 MiB; 128.0 GiB in 4.1104 s.",
+      "weka_sdf_scratch_reader_GBps": 8.4211,
+      "weka_detail": "pre-existing tier_t2_weka_scratch.npy (68719476864 B, wide (16384,1048576)); block_rows=256 to hold the 1 GiB BLOCK SIZE constant; 48.000 GiB in 6.120 s. Per-block mean 8.4324, median 8.4976, p10 8.2665, p90 8.6143. Nothing was written to weka.",
+      "verdict": "/lscratch is 4.35x weka. On /lscratch the reader (36.64) EXCEEDS the pinned PCIe ceiling (26.68) by 1.36x, so the pipeline there is PCIe-bound; on weka the read (8.42) is 32 pct of the PCIe ceiling, so the pipeline there is READ-bound. That is why /lscratch is the record tier.",
+      "reader_vs_media": "BlockReader 36.64 vs raw dd 33.44 \u2014 the reader is not the bottleneck on /lscratch; it is FASTER than 16-stream dd, which closes the inherited 'reader vs raw media ~6 pct gap' open question in the opposite direction on this node.",
+      "failure_worked_around": "The first weka attempt used block_rows=8192, which is 1 GiB only at n=32768; the weka file is wide with row_bytes 4194304, so 8192 rows meant a 32 GiB block of which only 2 exist -> 'reading -14 blocks', TOTAL bytes=0, ValueError: zero-size array to reduction operation minimum. Repro: python probe_read.py <weka .npy> 8192 16 16 48.",
+      "CORRECTION_per_block_reference": "VERIFIED CORRECTION (caught by the iteration-5 runner, which compared against the file rather than against my brief). The iteration-1 per-block /lscratch figures are, from iter01/item7_floors.txt line 165: mean 37.3320, median 37.8776, min 6.4800, max 38.4636, p10 36.2127, p90 38.1700 GB/s. I had quoted 'median 37.42, max 38.62' in the iteration-5 brief; those numbers were mis-transcribed and are withdrawn.",
+      "re_measured_iteration_5": "VERIFIED. The SAME probe script (md5 c054b1947628b23733e14c64e8aa449a), byte-identical arguments, four runs: 36.8842 / 36.8144 / 36.7831 / 36.8184 GB/s, spread 0.275 pct -- MARGINALLY FASTER than iteration 1's 36.6416. Raw 16-stream dd iflag=direct: 37.4671 GB/s against iteration 1's 33.4369, +12.05 pct. THE MEDIA IS NOT DEGRADING. Per-device under load: all six RAID-0 members at 6.16 GB/s, 99 pct util, r_await 2.1 ms, within 0.04 pct of each other (6165008-6167472 kB/s), zero writes."
+    },
+    "capacity_2026-08-16": "INHERITED read-only probe: /sdf/scratch 910T size 187T avail; /sdf/data/lcls 12P size 645T avail."
+  },
+  "slurm": {
+    "account_qos_partition": "INHERITED. lcls:prjdat21 / normal / ada. qos normal Preempt=preemptable, PreemptMode=cancel; DefMemPerCPU=4000; SelectTypeParameters=CR_CORE_MEMORY; TaskPlugin task/cgroup,task/affinity.",
+    "salloc": "VERIFIED. The --mem=0 line was granted; see hardware.CORRECTION_mem0.",
+    "steps": "INHERITED + partially VERIFIED. srun --jobid=<id> --ntasks=1 --gres=gpu:10 <cmd>. Without --gres, zero GPUs and jax falls back to CPU at exit 0. Steps SERIALISE behind a running step \u2014 observed this iteration when an env probe blocked behind the running store generator.",
+    "CORRECTION_queue_state": "VERIFIED CORRECTION. The inherited expectation was a busy queue (16 healthy ada nodes all allocated on 2026-08-16). The exclusive request was nonetheless granted in 46 s, because qos normal preempts the qos preemptable jobs holding the nodes. Report the wait; do not assume it is long.",
+    "jobs_THIS_CAMPAIGN": "35176504 / sdfada015 / granted 2026-08-16T17:10:31 node-local / 48 h \u2014 see hardware.allocations_THIS_CAMPAIGN."
+  },
+  "bridge": {
+    "ssh": "VERIFIED. plain `ssh -o BatchMode=yes sdfiana025 '<cmd>'` works from this VM as cwang31.",
+    "start": "INHERITED. bridge-session start --name <n> -- ssh sdfiana025 'uv run ~/bridge-server --root-dir /sdf/data/lcls/ds/prj/prjcwang31/results/codes'; drive with bridge --timeout 900 --session <n> bash '...'.",
+    "ceiling": "Up to 4 live sessions, one per concurrent caller; names ooc1..ooc4; stop what you start.",
+    "sessions_THIS_CAMPAIGN": "VERIFIED. All four pre-existing sessions (elog1, swj1, swj2, swj3) were DEAD at iteration 1, so all 4 slots are free. iteration 1: ooc2 (setup runner, started and stopped), ooc3 (origin runner)."
+  },
+  "environment": {
+    "uv": "VERIFIED. uv for every python invocation, local and remote. Remote uv 0.9.8.",
+    "W": "VERIFIED. /sdf/data/lcls/ds/prj/prjcwang31/results/codes/srsvd-ooc-throughput, created this iteration with logs/ stores/ uv-cache/ iter01/ .venv-cand .venv-champ .venv-gen. UV_CACHE_DIR=$W/uv-cache.",
+    "venv_build": "VERIFIED. uv venv $W/.venv-<x> --python 3.12; uv pip install --python $W/.venv-<x>/bin/python 'jax[cuda12]' numpy; then per iteration --reinstall --no-deps each srsvd package at an explicit @sha.",
+    "unpinned_url_trap": "INHERITED. The bench pyproject pins srsvd-jax to a git URL with NO rev; a plain install silently resolves the library to main HEAD at exit 0. Fingerprint = direct_url.json without 'requested_revision'. --no-deps prevents it.",
+    "editable_dirty_trap": "VERIFIED CORRECTION (found by the H1 implementer). The bench's in-process SHA reporter stamped '+dirty' on any editable checkout carrying an untracked file \u2014 i.e. on srsvd-jax always, because of its untracked uv.lock. Fixed in bench commit f85c37c to distinguish '+untracked' from '+dirty'.",
+    "card_hygiene": "VERIFIED this iteration; see hardware.cards_sdfada015.",
+    "venvs_THIS_CAMPAIGN": {
+      ".venv-gen": "VERIFIED. lib@9a1f214 + bench@67d94db (pre-change SHAs), --no-deps; used ONLY to regenerate the store.",
+      ".venv-cand": "iter01-02: lib@66e15d4 + bench@f85c37c. iter03: lib@38be495 + bench@b051d96 (bf16). All direct_url.json carried requested_revision; the unpinned-URL trap never fired.",
+      ".venv-champ": "iter01-03: lib@66e15d4 + bench@f85c37c. iter04: being reinstalled to lib@38be495 + bench@b051d96 because c3a-bf16 is the new champion."
+    }
+  },
+  "code_delivery": {
+    "repos": "VERIFIED. work/srsvd-jax (github.com/carbonscott/srsvd-jax) and work/srsvd-jax-bench (github.com/carbonscott/srsvd-jax-bench); gh authenticated as carbonscott. PRE-CHANGE HEAD SHAs: 9a1f214dbd9c7abb1c3f7f45c2a9a4955c354330 (lib) and 67d94db1111ee7611072659ce50b0563db5e83d2 (bench).",
+    "branch": "VERIFIED. ooc-throughput created off whole-job in BOTH repos at those SHAs (iteration 1) and pushed. Nothing on main, nothing on whole-job, nothing force-pushed.",
+    "results_repo": "VERIFIED. work/srsvd-ooc-results, git init at 286e3553a0ee12aa42a8a12510c95d3b99d00914 (iter01 bootstrap); iter01 setup artifacts committed at e3d07e7071b7a57fc5216d76a3f3ff48ceb8d9bb (23 files).",
+    "entry_points": "INHERITED + VERIFIED by orchestrator read. srsvd_jax.stream.run(...) now takes steady= and _session=; run_steady(path, window_s, min_blocks, max_jobs, on_job, **kw) is the job loop; _pass takes steady= and seqc=; steady.SteadyWindow / SeqCounter are new. core.make_step jit donate_argnums=(0,); reader.py O_DIRECT preadv + anonymous mmap pool; compilewatch.py; PhaseClock; bench cli.py cmd_run + --steady-window-s / --steady-min-blocks / --steady-max-jobs / --steady-force-restart-rows / --nvsmi-out / --nvsmi-uuid / --iter / --candidate-id / --tier / --realmemory-bytes.",
+    "shas_THIS_CAMPAIGN": {
+      "lib_ooc-throughput": [
+        "66e15d4b91f105fd3ecd4db67a30c885a3a19879 (iter01 H1)",
+        "38be495266b853f6be3f550bf0e5f5a7ed6072b3 (iter02 bf16-wire; CHAMPION)",
+        "3ff2460933dbcdad64f565c6ba40bda4eee7941e (iter04 convert-threads; UNMEASURED)"
+      ],
+      "bench_ooc-throughput": [
+        "33a9952 (iter01 H1)",
+        "f85c37c6e8d386aa5890cb094b2a6e115afe402e (iter01 H1)",
+        "b051d96f262fbfd30dc4eca1dc857f59fb12b5ab (iter02 bf16-wire; CHAMPION)",
+        "8f66c7cc65262e80d18cc15ce426dcf296cadf81 (iter04 --convert-threads; UNMEASURED)"
+      ],
+      "results_repo": [
+        "286e355 bootstrap",
+        "e3d07e7 iter01 setup",
+        "3f4c952/81fc3ae/a372296/3e4616b/90fa8c5/ad01500/20a60fb iter01 origin+proofs",
+        "3414849/ecabfd8/97a6aec/1c57a05/b1fb405/2ae136f/d8b0cd2/20cb695/e1b0e20 iter02",
+        "iter03 commits in the runner's report"
+      ]
+    }
+  },
+  "instrumentation": {
+    "compile_watchdog": "INHERITED + extended by H1. compilewatch.py listeners on /jax/core/compile/* and /jax/compilation_cache/*; H1 adds snapshots at window OPEN and window CLOSE so compiles_in_window is the window-scoped count. SRSVD_WARMUP_SKIP=bbt,concat,tail,finishgemm,committed forces a REJECT. compiles_in_warmup does NOT fall on a warm cache; only compiles_in_window == 0 is meaningful.",
+    "phase_clock": "INHERITED. Host PhaseClock buckets pass_setup/read_wait/pool_acquire/read/host_prep/h2d_issue/step_issue/fifo_bookkeeping/sync_wait/drain_sync/producer_join/concat_issue/next_sketch_issue/pass_guard_sync/pass_epilogue/bbt_issue/final_sync. SRSVD_PHASE_SPANS=1 records absolute spans.",
+    "nvsmi_hook_H1": "VERIFIED against the real driver over 20 timed rows. --nvsmi-out spawns one background nvidia-smi --query-gpu=uuid,clocks.sm,power.draw,clocks_throttle_reasons.active,utilization.gpu --format=csv,noheader --loop-ms=5000 writing epoch-prefixed lines for EVERY card; filter by the uuid column because NVML ignores CUDA_VISIBLE_DEVICES. Three '#' header lines; stderr is merged into the file. MEASURED ACROSS EVERY ROW OF ITERATIONS 1-3: SM clock pegged at 2520 MHz and throttle-reason mask 0x0 in EVERY in-window sample of every row; power 89.8-150.8 W against a 350 W board limit. THIS CORRECTS THE INHERITED CLAIM that every L40S on these nodes is power-capped at ~350 W running 1560-1740 MHz with throttle 0x4 SW Power Cap -- on this transfer- and read-bound workload the cards are neither clock- nor power-limited, so no result in this campaign is a DVFS artifact. utilization_gpu median is the useful signal instead: 69 pct at the origin, 100 pct at the pinned f32 champion, 80 pct at the bf16 champion where the reader can no longer keep the card fed.",
+    "nsys": "INHERITED. nsys 2025.3.1.90; mandatory --trace=cuda,nvtx --cuda-graph-trace=node --sample=none --cpuctxsw=none; assert non-zero kernel count and H2D byte reconciliation; a profiled wall never headlines; the JAX profiler cannot co-exist with nsys.",
+    "whole_job_1card_time_budget_INHERITED": "193 GB store, register: H2D DMA busy 21.449 s = 83.7 pct of the 25.64 s loop at 27.04 GB/s per copy; kernels 4.136 s = 16.1 pct, SERIAL with the DMA; device idle 0.055 s.",
+    "profiles_THIS_CAMPAIGN": "NONE YET",
+    "instrument_failures_disclosed": "VERIFIED. Iteration 5's runner disclosed that its first /proc/diskstats reader mis-indexed the fields and printed rd_ticks in the read_GB/s column; it fixed the script, re-ran, and committed BOTH the broken record (item4_diskstats.txt, whose read_GB/s and aqu columns are garbage while r_iops and util are correct) and the good one (item4b_diskstats.txt), naming which is which. item4_iostat.txt was never affected. Recorded here because a rig that hides its own instrument failures cannot be trusted about anything else.",
+    "runner_failures_this_campaign": "VERIFIED. Server-side API 529 errors killed the iteration-10 runner after 5 of 8 rows and the iteration-13 runner after 6 of 7. In both cases the on-disk artifacts were intact and already committed, and a continuation runner executed ONLY the missing rows against the SAME unchanged driver script, so no measurement was repeated or discarded. Recorded because it is a property of the campaign's operation, not of the pipeline under test."
+  },
+  "jax_facts": {
+    "checkout": "INHERITED. /home/exedev/software/jax at 84c9fc2d94, version 0.11.1-dev; the deployed build is 0.11.0 \u2014 confirm before citing.",
+    "transfer": "device_put async (api.py:2338); zero-copy semantics for jit args (jaxlib/pjit.cc:509, py_values.cc:632-644); no per-device transfer queue/in-flight cap in jax/_src; compute_on('gpu_stream:N') compute_on.py:54-59; buffer_callback exposes XLA's stream (buffer_callback.py:38, :82-84); pinned host routes: client.dma_map (py_client.cc:1099-1112), dlpack kDLCUDAHost (dlpack.py:84-92), memory kind pinned_host (core.py:1914-1917), __cuda_array_interface__ device pointers only.",
+    "pinned_host_measured": "VERIFIED addition: memory_kind='pinned_host' then a jit copy to 'device' reached 26.9071 GB/s median on sdfada015, marginally FASTER than cudaHostRegister + device_put (26.6863). Both are ~1.13x pageable.",
+    "readiness": "INHERITED. Array.is_ready() C++-only (py_array.cc:2382-2384); jax.block_until_ready batched (api.py:2790); copy_to_host_async (array.py:624-632).",
+    "donation": "INHERITED. pjit.py:699-711; disabled silently under jax_debug_nans; FIFO on (shape,dtype,memory kind); kwargs never donate.",
+    "threads": "INHERITED. GIL released in jit execute and device_put; jax.transfer_guard('disallow') catches implicit H2D.",
+    "xla_flags": "INHERITED. --xla_gpu_enable_latency_hiding_scheduler is the copy/compute-overlap flag; XLA flags are in the compilation cache key; XLA_PYTHON_CLIENT_* are read by the C++ PJRT client only."
+  },
+  "floors_and_time_budget": {
+    "one_job_terms_THIS_NODE": "VERIFIED floors, arithmetic by the orchestrator. Q_disk = Q_pcie = 4,638,564,679,680 B per job (3 passes). Q_hbm ~ 3 x Q_pcie because the jitted step reads Ar three times (Ar@Om, Yr.T@Ar, sum(Ar**2)) = 1.39157e13 B. W = npass*m*(4nL+2L^2) = 1.9494e14 FLOP at L=42. T_disk = 4638.565/36.64 = 126.6 s. T_pcie(pinned) = 4638.565/26.68 = 173.9 s <- BINDING. T_pcie(pageable) = 4638.565/23.61 = 196.5 s. T_hbm = 13915.7/664.8 = 20.9 s. T_compute = 1.9494e14/9.56e13 = 2.04 s (P_peak measured on the record card, f32 GEMM via TF32). T_min = 173.9 s, binding term PCIe. One-card STEADY5 roof = 26.68 x 300 = 8004 GB.",
+    "time_budget_THIS_CAMPAIGN": "VERIFIED, kept current to the champion (contract requires at most one champion old). ORIGIN (iteration 1, job 316.186 s, 4320 blocks): read 126.694 s 40.07 pct, step_issue 188.136 s 59.50 pct, h2d_issue 0.947 s, sync_wait 0.196 s; read and transfer FULLY SERIAL (29.3+43.5 = 72.8 ms/block vs 73.2 measured); binding term PCIe; T_min 173.9 s pinned; gap 1.82x = the method file's 'not reaching a roof' branch. CHAMPION c2b-register (iteration 2, job 205.10 s): read 130.679 s 63.71 pct, sync_wait 72.261 s 35.23 pct, step_issue 0.901 s 0.44 pct; host idle, GPU utilisation median 100 pct; device time splits into DMA 4638.565/26.68 = 173.9 s plus kernels 31.2 s = 15.2 pct SERIAL with the DMA; gap 1.18x = the 'AT A ROOF' branch; 84.1 pct of the 8004 GB one-card f32 roof. CHAMPION c3a-bf16 (iteration 3, job 139.077 s): read 136.476 s 98.13 pct, sync_wait 0.138 s 0.10 pct, step_issue 1.164 s, h2d_issue 1.073 s, everything else under 0.1 s, unattributed 0.0018 pct, tiling error 0.0. BINDING TERM IS NOW THE NVMe READ. In-pipeline read 4638.565/136.476 = 33.988 GB/s against a 36.6416 GB/s standalone probe (7.2 pct below) and a 38.62 per-block max. GPU utilisation median 100 -> 80, i.e. the card is starved. Achieved 9890.776 GB = 90.0 pct of the 10992 GB read roof. Ledger iteration of the origin's time budget: 1. Ledger iteration of the first candidate: 2. The budget preceded the optimisation. CHAMPION c7b-convert4 (iteration 7, job walls 138.218/137.498/137.627 s): read 135.853 s 98.29 pct, step_issue 1.045 s 0.76 pct, h2d_issue 0.968 s 0.70 pct, sync_wait 0.133 s 0.10 pct, unattributed 0.0018 pct. Still READ-BOUND. In-pipeline read 34.2395 GB/s against a 36.88 GB/s standalone probe (7.2 pct below) and a 37.47 GB/s raw dd. Achieved 9909.201 GB = 90.1 pct of the 10992 GB read roof. GPU utilisation median 79 -- the card is starved, which is the correct signature of a read-bound pipeline. FAST-REGIME BUDGET (iteration 11, under numactl --interleave=all): champion config read 33.94 GB/s; cast-free f32 read 36.59 GB/s, i.e. the bf16 cast costs 7.26 pct of the read; standalone probe 36.88 GB/s, so the cast-free pipeline is within 0.78 pct of the probe and THE CAST IS THE ENTIRE PROBE-VS-PIPELINE GAP. --convert-threads 4 recovers 36.9 pct of the cast, giving read 34.92 GB/s and 10106.082 GB = 91.9 pct of the 10992 GB read roof."
+  },
+  "levers_measured_by_whole_job": {
+    "null_inside_noise": "INHERITED: --depth 4, --chunks 2, --h2d pinned, --read-chunk-bytes 64M/256M.",
+    "harmful": "INHERITED: --sync-mode lockstep (+44 pct; positive control), --threads 32 (unexplained), --block-rows 2048 without register.",
+    "anti_combinations": "INHERITED: --readahead worth 12.2 s alone but costs ~0.8 s with register; larger --block-rows helps without register, hurts with it (pin fee scales with pool size). ORCHESTRATOR NOTE, NEW MECHANISM FOR THIS CAMPAIGN: the pin fee is a ONE-TIME cost paid before the window opens, so the steady-state metric EXCLUDES it. Both anti-combinations were priced against a per-process wall and must be re-priced here.",
+    "unclaimed_ranked": "INHERITED: 1) --h2d register on this store (never applied); 2) bf16 on the wire (never tested); 3) copy/compute overlap (16 pct of loop, mechanism undiagnosed); 4) fixed cost (excluded by steady state); 5) finish on device; 6) reader vs raw NVMe (CLOSED on this node: the reader is faster than dd).",
+    "retried_with_new_mechanism_THIS_CAMPAIGN": "--threads 32: whole-job called it harmful and unexplained; retried in iteration 3 under a read-bound bf16 regime and it is HARMFUL AGAIN at -20.79 pct, with the mechanism now measured -- read alone grows 136.476 -> 173.521 s (+27 pct) and no other bucket moves, so it slows the O_DIRECT read itself. --readahead + --h2d register: whole-job called them anti-combining because the pin fee scaled with pool size against a per-process wall. This campaign's metric excludes the pin fee (measured 2.430 s for the f32 pool and 1.085 s for the wire pool, both before window_open), so that reason does NOT transfer -- yet they still anti-combine (+0.031 pct, a NULL) for a DIFFERENT reason: once the pool is pinned the depth-2 FIFO already supplies the overlap readahead adds. --read-chunk-bytes 64M/256M: whole-job measured NULL when the read was 40 pct of a wall dominated by a staging copy and the floor was 9 pct. Being retried in iteration 4 at 16M/32M because the read is now 98.13 pct of the wall and the floor is 0.0812 pct -- the earlier NULL was unmeasurable, not absent.",
+    "ruled_out_by_this_campaign": "fp8 or any wire dtype below bf16: G3_subspace_sin_theta is the binding gate at 2.076572e-03 against 1e-2 = 4.8x headroom, and fp8 e4m3's ~6e-2 epsilon exceeds it by orders of magnitude. The precision lever is exhausted. Caching part of the store in host RAM across passes: 48.7 pct of the 1546188226688 B store would fit in the 753766760448 B of host memory and would cut disk traffic 32 pct, but the contract makes buffered reads and page-cache exploitation never eligible and an application-level cache is that lever with a different implementation. Ruled out as metric-gaming, recorded so it is not rediscovered.",
+    "discovered_by_this_campaign": "--h2d register: +58.470 pct (iteration 2). The origin was paying a synchronous host staging copy inside the jit dispatch; pinning collapses step_issue 198.918 -> 0.901 s. --wire-dtype bfloat16: +47.028 pct (iteration 3), numerics-affecting, gate PASS with G3 binding at 4.8x headroom. --convert-threads: NULL. Crowned in iteration 7 at +39.633 pct on n=1 and WITHDRAWN in iteration 8 when three spread repeats came back -28.19 pct lower; the 0/1/2/4/6/8 curve saturates on the convert-threads-0 baseline. --convert-threads 8: NULL (+0.6982 pct). Non-monotone against 4; unexplained as of iteration 7. --readahead: +32.696 pct alone, NULL (+0.031 pct) once the pool is pinned. numactl --interleave=all: +38.016 pct (iteration 9, n=1) -- not a throughput lever but a PLACEMENT lever; it does not make the pipeline faster than it has ever been, it makes the fast regime reachable on demand instead of by lottery. --pool-hugepages populate: NULL (+0.20 pct) despite the mechanism provably firing. --pool-hugepages both: -1.63 pct, slightly harmful. CORRECTION TO THE --convert-threads ENTRY ABOVE: its iteration-8 NULL was REGIME-BOUND. Re-measured inside the deterministic fast regime (iterations 11-12) it is the champion at 4 threads, +2.723 pct over a same-iteration control mean and replicated to 0.339 pct; below 4 threads it is HARMFUL (2 threads -15.5 pct, 3 threads -7.0 pct) because the decoupled cast back-pressures the reader."
+  }
+}

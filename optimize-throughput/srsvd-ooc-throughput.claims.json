@@ -1,0 +1,252 @@
+{
+  "goal": "Beat the previous best steady-state OUT-OF-CORE throughput of srsvd-jax on ONE L40S, 100 iterations of implement-then-measure. The record metric is STEADY5_GB: gigabytes of a FIXED 1.546 TB synthetic store (2.05x the node's RealMemory) consumed by the END-TO-END pipeline (node-local NVMe O_DIRECT read -> host -> PCIe -> device kernel) inside a 300 s steady-state window that excludes process start, compile and warm-up, at a FIXED algorithm (k=32 p=10 q=2, 3 passes) with the numerics gate passing. Every candidate is judged against the champion re-measured in the same iteration; the work may lie in srsvd-jax or in the end-to-end pipeline (bench, reader, host path, JAX usage).",
+  "slug": "srsvd-ooc-throughput",
+  "claims": [
+    {
+      "id": "C1",
+      "provenance": "verified",
+      "evidence": "I read origin1/2/3's STEADY5-ROWs and origin*.steady.json myself on sdfada015 (job 35176504, card GPU-a1746c8f-803d-04b4-fa54-01c28d81467e): steady5_gb 4405.946807 / 4039.636815 / 4069.478213, spans 300.046957/300.063397/300.079399, reconcile OK with blocks_consumed x 1073741824 == bytes_consumed to the byte (4104/3763/3791), compiles_in_window=0, gate PASS with all four gates BINDING.",
+      "claim": "The ORIGIN under harness H1 on this node is 4069.478 STEADY5_GB (median of three fresh processes, 13.565 GB/s). It remains the record to beat and the denominator of every factor quoted."
+    },
+    {
+      "id": "C2",
+      "provenance": "verified",
+      "evidence": "Same three rows: (max-min)/median = (4405.946807-4039.636815)/4069.478213 = 9.0014 pct. The phase tables I read give read 126.69/125.44/125.30 s (stable to 1.1 pct) against step_issue 188.14/217.96/215.74 s (spread 15.9 pct); nvidia-smi filtered to the record card's UUID over each window shows SM 2520 MHz in every sample, power 107-130 W of 350 W, throttle mask 0x0. Iteration 3 control-champ-a 6727.283413 and control-champ-b 6721.820411, (max-min)/median = 0.0812 pct.",
+      "claim": "The noise floor is a property of the CONFIGURATION, not of the rig: 9.00 pct at the origin (unpinned, 3 processes) and 4.04 pct for two origin controls inside one iteration, but 0.0812 pct for two PINNED champion controls in iteration 3 -- a ~50x reduction. That confirms iteration 1's localisation of the origin floor to the pageable transfer path, and it is what makes 1 pct effects resolvable from iteration 4 onward."
+    },
+    {
+      "id": "C3",
+      "provenance": "verified",
+      "evidence": "origin1.steady.json job 0, phase_s read 126.694056 s and step_issue 188.135552 s of a 316.186328 s wall, h2d_issue 0.946515 s, sync_wait 0.196240 s, phase_tiling_error_s 0.0, phase_unattributed_pct 0.0018. Arithmetic: 1.0737 GB / 36.64 GB/s = 29.3 ms and 1.0737 GB / 24.7 GB/s = 43.5 ms; 29.3+43.5 = 72.8 ms/block against 316.186/4320 = 73.2 ms measured.",
+      "claim": "The origin's transfer is paid INSIDE the jitted step dispatch (device_put itself returns in 0.22 ms/block) and is FULLY SERIAL with the O_DIRECT read. The device is never the constraint: sync_wait is 0.06 pct of the wall."
+    },
+    {
+      "id": "C4",
+      "provenance": "verified",
+      "evidence": "Measured on sdfada015 in-allocation and re-read by me from item7_floors.txt / item7_tier_table.txt: BlockReader O_DIRECT 1 GiB blocks 16 threads 36.6416 GB/s on the real store (224.001 GiB in 6.564 s, first 512 blocks skipped); dd iflag=direct 16 streams 33.4369 GB/s; PCIe H2D 1 GiB x 25 repeats pinned-by-cudaHostRegister 26.6777 GB/s mean and pinned_host memory kind 26.9071, pageable 23.6071; HBM triad 664.801 GB/s.",
+      "claim": "On THIS node the binding link for one card at f32 on the wire is PCIe at 26.68 GB/s, giving a one-card STEADY5 roof of 8004 GB per window; halving the wire bytes moves the binding link to the NVMe reader at 36.64 GB/s and the roof to 10992 GB. Both roofs are LOWER than the inherited sdfada008 figures of 8.08 and 11.7 TB."
+    },
+    {
+      "id": "C5",
+      "provenance": "verified",
+      "evidence": "item7_tier_table.txt, same BlockReader and the same 1 GiB BLOCK SIZE on both tiers: /lscratch 36.6416 GB/s, /sdf/scratch (weka) 8.4211 GB/s over 48 GiB of a pre-existing 64 GiB file. The first weka attempt at block_rows=8192 failed verbatim ('reading -14 blocks', ValueError) because that file is wide with row_bytes 4194304; block_rows=256 holds the block size constant.",
+      "claim": "/lscratch is the record tier by 4.35x over weka. On /lscratch the read (36.64) exceeds the pinned PCIe ceiling (26.68), so the pipeline there is PCIe-bound; on weka the read is 32 pct of that ceiling, so it would be read-bound."
+    },
+    {
+      "id": "C6",
+      "provenance": "verified",
+      "evidence": "I read src/srsvd_jax/steady.py and the steady/session wiring in stream.py at 66e15d4 myself: SteadyWindow._open drains every outstanding block and folds it into blocks_streamed BEFORE taking t_open, so nothing is pending at open and no block can be double counted; _tally is a second independent accumulation; the jitted step is hoisted into the session because core.make_step returns a new closure per call and jax keys its caches on the function object. On the real store: reconcile OK on every row, spans 300.047-300.080 in [300.0,302.0], compiles_in_window 0 on every row, and item 6 showed 2 in-process job restarts inside a 60 s window with warmup_skipped True on jobs 2-3 and no re-pin.",
+      "claim": "Harness H1 (srsvd-jax 66e15d4 + srsvd-jax-bench f85c37c) implements the contracted metric correctly and is frozen."
+    },
+    {
+      "id": "C7",
+      "provenance": "verified",
+      "evidence": "Iteration 2 proof-reject-150: SRSVD_WARMUP_SKIP=concat at --steady-window-s 150 gave compiles_in_window=1 naming trace/lower/compile jit(concatenate) at 0.968519 s of a 150.027289 s span, seq [34,1900], exit_code=4, and the harness printed '*** COMPILE WATCHDOG REJECTS THIS ROW ***'. Iteration 1's 60 s attempt gave compiles_in_window=0 at exit 0 with the job's own compiles_in_wall=4, which is what diagnosed the window length.",
+      "claim": "The watchdog REJECT proof is demonstrated. A 150 s window spanning the pass boundary at block 1440 catches the deferred compile that a 60 s window missed."
+    },
+    {
+      "id": "C8",
+      "provenance": "verified",
+      "evidence": "Iteration 3 control-q0: G1 1.927512e-02 FAIL, G2 6.159399e-01 FAIL, G3 1.144574e-01 FAIL, G4 4.482072e-01 FAIL and BINDING, rejected_by=['G4_residual_excess'], exit 3, no breakdown at any pass boundary -- reproducing whole-job's own G4 4.4821e-01. Iterations 1-2 control-degraded-{2,8,20,30}: identical 'next_sketch broke down at pass boundary 1/3' with exit 1 and no gate values.",
+      "claim": "The numerics gate rejects a valid-but-worse factorisation with every value printed, and --q 0 is the control that does it. --degraded-rank cannot: it breaks the library down at pass boundary 1/3 before any factorisation exists, at every rank tried (30, 20, 8, 2), so it is structurally a breakdown control at L=42."
+    },
+    {
+      "id": "C9",
+      "provenance": "verified",
+      "evidence": "Generator banner on sdfada015: layout=tall shape=(11796480,32768) bytes=1546188226688 seed=0 rank=32 alpha=1.000 eps=1.000e-03, row_blocks=23040 row_block=512, wall 1293.005 s at 1.196 GB/s, 'ordering survival at k=32 MARGIN 18.399x'; ls -l shows 1546188226688 bytes exactly; slice sha256 head/middle/tail d47edcb6.../b592e8e2.../4c8a6c78...; and the three origin runs' gate values (G1 1.72595e-06, G3 2.05523e-03, G4 8.84412e-05) reproduce whole-job's values on the original store (1.7159e-06, 2.0544e-03, 8.785e-05) to 3-4 digits.",
+      "claim": "The regenerated store is the campaign's fixed store. Bit-identity is corroborated four ways -- exact byte count, row_blocks 23040, ordering margin 18.399 matching armbig_meta.json, and the gate values reproducing whole-job's to 3-4 digits -- and the three slice hashes are the fingerprint every later regeneration must match."
+    },
+    {
+      "id": "C10",
+      "provenance": "verified",
+      "evidence": "item2_env.txt read by me from inside the GPU step: nvidia-smi shows index 9 GPU-163d23c0-bfcb-7af9-2aab-bb1e85693cfe with ecc.errors.uncorrected.volatile.total = 2, and jax printed 'Failed to create stream executor for device CUDA:9: CUDA_ERROR_ECC_UNCORRECTABLE' with jax.devices() returning 9 devices, not 10.",
+      "claim": "Card 9 on sdfada015 is ECC-dead and is refused for the life of this allocation; the record card is GPU-a1746c8f-803d-04b4-fa54-01c28d81467e (index 4, 95.60 TFLOPs, ECC clean). Measured card-to-card spread on a compute probe is 6.11 pct, not the ~12 pct inherited."
+    },
+    {
+      "id": "C11",
+      "provenance": "verified",
+      "evidence": "The setup runner measured two 4096x1024 tall stores identical in every argument but --row-block and got the same size with different sha256 (51401b84... vs 67e8a2b3...); gen.py:195/198 key Philox on counter=2*rb. gen.py's own docstring claims the opposite.",
+      "claim": "gen.py's docstring claim that 'the store on disk is the same bytes whatever --row-block was' is FALSE. --row-block is part of the store's identity and this campaign's store requires --row-block 512. Running the default 8192 would have produced a different store and silently invalidated every row."
+    },
+    {
+      "id": "C12",
+      "provenance": "verified",
+      "evidence": "Iteration 2 rows control-a 4246.413631, c2a-readahead 5634.756780, c2b-register 6729.313430, c2c-register-readahead 6731.389521, control-b 4417.784410, all at lib@66e15d4+bench@f85c37c, run 35176504/sdfada015/GPU-a1746c8f; phase tables read directly by me.",
+      "claim": "Page-locking the pool (--h2d register) was worth +58.470 pct and moved the champion to 6729.313 GB. The mechanism is settled: the 43.5 ms per block the origin paid inside the jit dispatch was a SYNCHRONOUS HOST STAGING COPY, because pinning collapses step_issue from 198.918 s to 0.901 s. --readahead is a smaller, real win (+32.696 pct) and combines with register for nothing (+0.031 pct, a NULL), because once the pool is pinned the depth-2 FIFO already supplies the overlap."
+    },
+    {
+      "id": "C13",
+      "provenance": "verified",
+      "evidence": "Iteration 3 c3a-bf16 at lib@38be495+bench@b051d96: steady5_gb 9890.775672, span 300.048765, blocks 9213, reconcile OK (9213 x 1073741824 = 9892383424512, which I recomputed myself), compiles_in_window 0, gate PASS with G1 3.652369e-06, G2 1.389044e-05, G3 2.076572e-03, G4 2.263700e-04 all BINDING, numerics_affecting=yes, exit 0. Implementer's numpy measurement: RNE |dsigma_max|/sigma_max 8.6e-07 to 4.8e-06 vs truncation 2.81e-03.",
+      "claim": "bf16 on the wire PASSES the fixed gate and is the champion at 9890.776 STEADY5_GB, +47.028 pct over its same-iteration control and 2.430x the origin. Pre-registration P2 holds in all three clauses. The cast must be round-to-nearest-even; truncation fails G1 by ~28x because it is a bias rather than noise."
+    },
+    {
+      "id": "C14",
+      "provenance": "verified",
+      "evidence": "Iteration 3 control-newcode: the bf16 SHAs (lib@38be495+bench@b051d96) run at --wire-dtype float32 measured 6724.656128 against control-champ-a's 6727.283413 = -0.039 pct, against a 0.0812 pct noise floor. Its row prints wire_bytes_per_block=0, wire_pool_pinned=False, dma_pool=staging.",
+      "claim": "The bf16 commit's 301 changed lines of stream.py are NEUTRAL at float32, so the +47.028 pct of c3a-bf16 is attributable to the wire dtype and not to code churn. Requirement R5 was tested with a whole timed row rather than trusted."
+    },
+    {
+      "id": "C15",
+      "provenance": "verified",
+      "evidence": "Champion phase table: read 136.475594 s of a 139.077083 s wall = 98.13 pct; sync_wait 0.138216 s (0.10 pct); utilization_gpu median fell 100 -> 80. In-pipeline read = 4638564679680/136.475594 = 33.988 GB/s, which I recomputed, against a standalone BlockReader probe of 36.6416 GB/s (per-block max 38.62) and raw 16-stream dd of 33.4369.",
+      "claim": "The binding term moved off PCIe onto the NVMe read at iteration 3 and has stayed there. At the current champion the read is 98.3 pct of the wall and the campaign sits at 90.1 pct of the 10992 GB read roof."
+    },
+    {
+      "id": "C16",
+      "provenance": "verified",
+      "evidence": "Iteration 3 c3b-bf16-t32: 7834.522665 against c3a's 9890.775672 = -20.79 pct, with read growing 136.475594 -> 173.520625 s (+27 pct) and every other phase bucket unchanged. Gate values identical to c3a within 1 pct.",
+      "claim": "--threads 32 is HARMFUL, not neutral, and it damages the O_DIRECT read itself rather than contending with the conversion or the transfer. whole-job found the same sign under a completely different regime, so the finding is robust across bottlenecks."
+    },
+    {
+      "id": "C17",
+      "provenance": "verified",
+      "evidence": "Arithmetic I performed on the campaign's own rows: iteration 2 register 4246.413631 -> 6729.313430 = 1.585x; iteration 3 bf16 6727.283413 -> 9890.775672 = 1.470x; product 2.330x. Measured origin-to-champion is 9890.775672/4069.478213 = 2.430x. The 4.3 pct discrepancy is the origin configuration's own upward drift between iterations 1 and 2 (median 4069.478 -> control-a 4246.414), which is inside its measured 9.00 pct floor.",
+      "claim": "The 2.430x gain decomposes into exactly two levers, each measured against its own same-iteration control: page-locking the host pool (1.585x) and halving the wire bytes (1.470x). Nothing else in the campaign has yet contributed a margin above the noise floor."
+    },
+    {
+      "id": "C18",
+      "provenance": "inferred",
+      "evidence": "Reasoning from C15 and the measured gate margins, not yet tested. G3_subspace_sin_theta is the binding gate at 2.076572e-03 against a 1e-2 threshold = 4.8x headroom, where G1 has 27x, G2 72x and G4 221x. fp8 e4m3 carries 3 mantissa bits (eps ~6e-2 against bf16's ~2e-3), so its perturbation to the subspace would exceed G3's headroom by orders of magnitude.",
+      "claim": "The precision lever is EXHAUSTED at bf16. No further wire-dtype reduction can pass the fixed gate, so the remaining one-card headroom must come from the read path alone. I will not spend a measured row on fp8."
+    },
+    {
+      "id": "C19",
+      "provenance": "inferred",
+      "evidence": "Contract text: buffered reads and 'any page-cache exploitation' are NEVER ELIGIBLE, and the store is fixed at 2.05x RealMemory by construction. Arithmetic: host memory is 753766760448 B against a 1546188226688 B store, so 48.7 pct would fit and caching it across the 3 passes would cut disk traffic 32 pct -- the largest arithmetic win still available.",
+      "claim": "Caching part of the store in host RAM across passes is ruled out as metric-gaming, not left unexplored. It is page-cache exploitation with an application-level implementation, and the 2.05x store-to-RAM ratio exists precisely to forbid it. Recorded here so it is not rediscovered as an opportunity."
+    },
+    {
+      "id": "C20",
+      "provenance": "verified",
+      "evidence": "Iteration 4 control-c4a 9738.620675 vs control-c4b 7158.282010, byte-identical commands 47 min apart, -26.4959 pct as a STEP; iteration 5 five back-to-back champion runs 7124.93-7170.03 (floor 0.6319 pct at n=5) with the standalone probe at 36.88 GB/s and raw dd at 37.4671 in the same hour; iteration 6 cliff sweep flat across a 16x pool-size change and a three-way tie between pool size, cudaHostRegister pinning and a live CUDA context.",
+      "claim": "A 26.5 pct step in the pipeline's read rate appeared mid-iteration-4 and never recovered. Six candidate causes were killed by measurement: NVMe thermal or device state, pool size, first-touch faulting, huge pages, host-pool pinning, the CUDA context, and other tenants on the node."
+    },
+    {
+      "id": "C21",
+      "provenance": "verified",
+      "evidence": "Iteration 7 c7a-wire-f32: the champion pipeline with --wire-dtype float32 -- same GPU consumer, same PCIe DMA, same pools, no cast -- reads 35.410523 GB/s (job reads 131.065795 and 130.922209 s) against a two-run control mean of 24.305784, +45.6876 pct. The standalone probe reads 36.78-36.88 GB/s, so the pipeline-vs-probe gap falls from 12.5 GB/s to 1.4.",
+      "claim": "THE READ REGRESSION WAS NEVER A REGRESSION. It is the in-thread f32->bf16 cast, whose cost rose from +4.24 pct of the read in iteration 3 to +45.7 pct under this node's host CPU contention. Every hardware explanation the campaign chased was correctly refuted; the cause was in the pipeline all along."
+    },
+    {
+      "id": "C22",
+      "provenance": "verified",
+      "evidence": "Iteration 7 c7b-convert4 at lib@ce84d803a8c4efb9791eeee6da256886c0baf93f + bench@fb41d16bbf46675188ec9b1641401083d2f7056d: steady5_gb 9909.201421, steady5_gbps 33.030671, read 34.239527 GB/s, span 300.043463, 9230 blocks reconciling to 9910637035520 B exactly (I recomputed), 3 jobs in window, compiles_in_window 0, gate PASS with G1 3.634074e-06 / G2 1.112192e-05 / G3 2.077870e-03 / G4 2.257397e-04 all BINDING, exit 0. Same-iteration control mean 7096.592202 -> +39.633 pct, 63x the 0.6319 pct floor. Neutrality proved by ctrl-newcode (candidate SHAs, feature off) at +1.0147 pct, and the ctrl-a/ctrl-b bracket moved only -1.2122 pct. SUPERSEDED BY iteration 8: c8-convert4-r1/r2/r3 = 7115.621628 / 7129.566577 / 7116.654994; c8-convert8-r2 = 7178.931710 against iteration 7's 7178.470117 (0.0064 pct apart across two iterations).",
+      "claim": "WITHDRAWN ON REPLICATION. --convert-threads 4 was crowned in iteration 7 at 9909.201421 GB on n=1; iteration 8's three spread repeats give 7115.62 / 7129.57 / 7116.65, median 7116.65, agreeing to 0.196 pct with each other and -28.19 pct from the record. --convert-threads is a NULL: the 0/1/2/4/6/8 curve reads 24.39/22.31/23.53/24.23/24.41/24.44 GB/s, a deficit at 1-2 threads repaid by 4 and then a plateau on the convert-threads-0 baseline. The iteration-7 margin was mode luck."
+    },
+    {
+      "id": "C23",
+      "provenance": "verified",
+      "evidence": "Iteration 7 c7c-convert8: read 24.475480 GB/s, +0.6982 pct on the control mean, -28.5 pct against convert4, with pool-backing fields byte-identical to convert4's. Iteration 7 c7b-convert4: 34.239527 GB/s.",
+      "claim": "The iteration-7 non-monotonicity never existed. convert8 reproduced to 0.0064 pct across two iterations; convert4 is what moved. The apparent effect was one fast-regime row among slow ones."
+    },
+    {
+      "id": "C24",
+      "provenance": "verified",
+      "evidence": "Iteration 7 rows print thp_shmem_enabled = 'always within_size advise [never] deny force', pool_map_kind = shared-anon(shmem), pool_thp_eligible = 0, pool_shmem_thp_pct = 0.0. The implementer separately showed mmap.mmap(-1,n) produces a MAP_SHARED shmem VMA (rw-s, VmFlags sh) on which madvise(MADV_HUGEPAGE) returns EINVAL.",
+      "claim": "The pools were never transparent-huge-page eligible on this node, settled from the kernel's own setting rather than inferred from smaps. AnonHugePages was 0 by construction, so no measurement reading that field could ever have supported or refuted a huge-page hypothesis; the refutation rests on the cliff sweep and the three-way variant tie."
+    },
+    {
+      "id": "C25",
+      "provenance": "verified",
+      "evidence": "Iteration 4 c4e-blockrows16384 at 2 GiB blocks: G1 6.2066e-05 against a 1e-4 threshold (62 pct of it, 17x the 8192 value), G2 8.9177e-05 (8x), G4 1.7026e-03 (7.5x, and 3.4x its own lower floor against 0.46x at 8192), G3 flat at 2.0810e-03. Throughput was a NULL (+2.06 pct against the contemporaneous control).",
+      "claim": "--block-rows is NOT numerics-neutral: larger blocks change the accumulation order of Gy, B and f2 and cost an order of magnitude of gate margin. Any future block-size change must carry its own gate values and be labelled numerics-affecting."
+    },
+    {
+      "id": "C26",
+      "provenance": "verified",
+      "evidence": "Iteration 5 process listing on a node allocated --exclusive with OverSubscribe=NO: eleven root wekanode processes, seven pegged at 100-101 pct CPU and hard-pinned to single cpus (pids 8645->cpu32, 8646->cpu33, others psr 29/30/31/34/35), four more at 29.0/24.8/16.0/11.1 pct; loadavg 12.24/14.41/18.47 while our job was idle; nproc 58 against SLURM_CPUS_ON_NODE 72.",
+      "claim": "The node is not exclusive in practice. That background is constant and so is not a confound between rows, but it is why an in-thread conversion that cost 4 pct when cores were free costs 46 pct now -- it is the standing condition that made C21's mechanism bite."
+    },
+    {
+      "id": "C27",
+      "provenance": "verified",
+      "evidence": "Iteration 8 ctrl-a 8985.820487 (read 30.68 GB/s) vs ctrl-b 7184.352770 (24.49) on byte-identical code and command 95 min apart, -20.05 pct, 32x the floor; ctrl-a was the first row after ~7.5 h of node idle. Across iterations 3-9 the in-pipeline read lands at either ~24.3-24.5 or ~30.7-35.4 GB/s, every job within a process agrees, and mode membership does not track the configuration.",
+      "claim": "The campaign has a per-process fast/slow read regime, chosen once at process start and held for the process's life, worth 25-40 pct. It has been masquerading as knob effects since iteration 4 and is the reason iteration 7's record did not survive."
+    },
+    {
+      "id": "C28",
+      "provenance": "verified",
+      "evidence": "Iteration 9 c9-numa-interleave: numactl --interleave=all gave 9874.654290 GB and a 34.225764 GB/s read against three controls at 7162.860776 / 7148.108871 / 7161.346048 (spread 0.2064 pct, inside the 0.6319 pct floor), +38.016 pct, 3 jobs per window instead of 2. The pool flag was OFF on that row (pool_rss_pct 59.99977, pool_setup_s 2.26e-05, pool_populate_via none), so the gain is placement and not residency. Free memory at launch: 25089 / 2878 / 4415 / 6274 MB on NUMA nodes 0/1/2/3 of ~193 GB each.",
+      "claim": "The regime is NUMA page placement and numactl --interleave=all HOLDS the fast regime -- 8/8 fast across iterations 9-11 with no slow draw ever recorded under the flag -- but it does NOT cause it: iteration 10's default-placement ctrl-a reached 9764.407 with no numactl at all, so iteration 9's +38.016 pct was measured against three consecutive slow draws. Against a fast control interleave is +0.98 pct, below the contract's 1 pct minimum. Its value is DETERMINISM, not speed. The mechanism is SPREADING, not starvation-avoidance: binding to node 0, the only node with real free memory, is the slowest configuration measured (-27.37 pct) with 24 CPUs available so it was not CPU-starved."
+    },
+    {
+      "id": "C29",
+      "provenance": "verified",
+      "evidence": "Iteration 9 c9-populate-r1 +0.2032 pct with the mechanism provably fired (pool_rss_pct 59.99977 -> 100.0, pool_setup_s 2.2e-05 -> 2.360763 s, pool_populate_via MAP_POPULATE, pool_rss_at_init_bytes 5368750080, no errors); r2 +8.139 pct against its bracketing controls but +7.908 pct against its own r1 on byte-identical flags with identical telemetry. c9-both -1.6272 pct with thp_shmem_enabled = 'always within_size advise [never] deny force', pool_thp_eligible 0.",
+      "claim": "MAP_POPULATE pre-faulting is a NULL on the real store under both default and interleaved placement, even though the mechanism provably fires; --pool-hugepages both is slightly harmful; the madvise half is a measured no-op because shmem THP is never on this node. Iteration 6's +17 pct probe effect does not transfer."
+    },
+    {
+      "id": "C30",
+      "provenance": "verified",
+      "evidence": "Iteration 10: three spread --interleave=all repeats 9854.547536 / 9859.851000 / 9881.433265 (spread 0.273 pct) plus iteration 9's 9874.654290 and iteration 10's interleave+populate 9899.003617. Five rows, two iterations, min 9854.547536, max 9899.003617, median 9874.654290, (max-min)/median 0.450 pct against a 0.6319 pct floor.",
+      "claim": "THE CONTRACT'S REPRODUCTION OBLIGATION IS SATISFIED. The champion configuration reproduces five times across two iterations within the noise floor when launched under numactl --interleave=all, and the band contains iteration 3's c3a-bf16 record of 9890.775672, so the historical record and the reproduction agree."
+    },
+    {
+      "id": "C31",
+      "provenance": "verified",
+      "evidence": "Iteration 11 c11-wire-f32 under interleave: read 36.591563 GB/s against a two-control mean of 33.935695, +7.8262 pct, and only -0.7821 pct below the 36.88 GB/s standalone BlockReader probe of iterations 1 and 5. Confounds recorded: f32 flips the bottleneck to the GPU (sync_wait 0.13 -> 76 s/job, read 98.2 -> 61.8 pct of span, utilization pinned 100) and changes the DMA pool topology.",
+      "claim": "The f32->bf16 cast costs 7.26 pct of the read in the FAST regime, and it is the ENTIRE probe-versus-pipeline gap. The pipeline is not structurally slower than the standalone reader; it is slower by exactly the cast. That closes a question open since iteration 5."
+    },
+    {
+      "id": "C32",
+      "provenance": "verified",
+      "evidence": "Iteration 11 c11-convert4 under interleave: 10106.082244 GB, read 34.915832 GB/s, +3.1706 pct on bytes and +2.8882 pct on read over a control mean of 9795.503395, three per-job read values spanning 0.0347 pct. c11-convert2: 8367.679696, read 28.678358, -15.4921 pct, with the read phase itself dilating to 161.3/162.2 s while read_wait_s stayed exactly 0 and utilization fell to 65.5.",
+      "claim": "Iteration 8's NULL verdict on --convert-threads was REGIME-BOUND and is overturned. In the fast regime 4 threads recover 36.9 pct of the cast's cost and are now the CHAMPION at median 10145.939 GB -- three repeats spanning 0.339 pct, four rows across two iterations spanning 0.514 pct, +2.723 pct over the same-iteration control mean. Below 4 threads the decoupled cast back-pressures the reader: 2 threads cost 15.5 pct and 3 threads 7.0 pct, so the curve has a TROUGH rather than a knee (0 -> 34.27, 2 -> 28.68, 3 -> 31.35, 4 -> 35.00, 6 -> 35.31 GB/s)."
+    },
+    {
+      "id": "C33",
+      "provenance": "verified",
+      "evidence": "Iteration 12 under numactl --interleave=all: c12-convert4-r1/r2/r3 = 10123.790 / 10145.939 / 10158.192 (median 10145.939, spread 0.339 pct) against controls ctrl-il-a 9898.651 and ctrl-il-b 9855.232 (spread 0.440 pct, both FAST). c12-convert6 10218.933 at read 35.31 GB/s, n=1. All rows: reconcile OK, compiles_in_window 0, gate PASS with all four BINDING, exit 0, convert_decoupled flipping False->True exactly on the flagged rows.",
+      "claim": "THE CAMPAIGN'S CHAMPION IS --convert-threads 4 under numactl --interleave=all at median 10145.939 STEADY5_GB: 2.493x the origin median and 92.3 pct of the 10992 GB read roof. It is the first coronation of the campaign to survive its own three-repeat replication test. c12-convert6 at 10218.933 is higher but n=1 and is not crowned."
+    },
+    {
+      "id": "C34",
+      "provenance": "verified",
+      "evidence": "Iterations 13-14 under numactl --interleave=all. convert6 replicated 10219.430/10202.353/10215.123 (median 10215.123, spread 0.167 pct). convert8 replicated 10274.621 (iter13) + 10250.668/10233.175/10265.215 (iter14), median 10257.942, spread 0.404 pct across two iterations, +2.917 pct over iteration 14's control mean 9960.131. convert10 10264.534 and convert12 10271.258 sit on the same plateau. Full fast-regime read curve: 0->34.05, 2->28.68, 3->31.35, 4->35.00, 6->35.25, 8->35.51, 10->35.48, 12->35.48 GB/s.",
+      "claim": "THE CAMPAIGN'S CHAMPION IS --convert-threads 8 under numactl --interleave=all at median 10250.668 STEADY5_GB: 2.519x the origin and 93.3 pct of the 10992 GB read roof. The thread response is a three-point PLATEAU at 8/10/12, not a peak, so the residual cast cost (~3 pct of the read, down from 7.26 pct) is NOT thread-limited. The host side of this pipeline is finished."
+    },
+    {
+      "id": "C35",
+      "provenance": "verified",
+      "evidence": "Iteration 16 under interleave at --convert-threads 8, control bracket 10208.398201/10212.711610 (0.0422 pct, tightest of the campaign). c16-nbuf8-isolation reproduces --sync-every 4's pool byte-identically (nbuf 8, pool_size_bytes 8590000128, wire_pool_size_bytes 4294967296) at sync_every 1 and returns -0.1025 pct. --sync-every 4 triplet 10306.870/10258.004/10269.710, median 10269.710, spread 0.4758 pct, +0.579 pct vs controls. Iteration 15's single 10384.021 is +1.1131 pct above that median. pool_rss_pct 37.5 at sync_every 1 vs 75.0 at sync_every 4 on the same pool. sync_wait falls 0.090 -> 0.038 pct of span, ~0.21 s per three jobs, against a ~2.3 s gain; read_s falls 131.4 -> 130.3 s per job.",
+      "claim": "--sync-every 4 is a NULL-BELOW-FLOOR at +0.579 pct median, not the +1.43 pct iteration 15's single row suggested. The effect is real in sign but under both the 0.6319 pct floor and the contract's 1 pct minimum. It belongs to the FLAG and not to the pool the flag derives -- the same pool at sync_every 1 returns -0.10 pct and leaves 5 of 8 buffers never resident -- and its mechanism is NOT the sync_wait it removes, which is an order of magnitude too small; the time comes out of the read phase and is unexplained."
+    },
+    {
+      "id": "C36",
+      "provenance": "verified",
+      "evidence": "Iteration 17, five consecutive unchanged champion rows under numactl --interleave=all at --convert-threads 8: 10203.387100 / 10206.826959 / 10206.615573 / 10197.936427 / 10220.351880, median 10206.615573, (max-min)/median 0.2196 pct; median within-process job-to-job read spread 0.1674 pct. Iteration 5's slow-regime n=5 floor was 0.6319 pct.",
+      "claim": "THE FAST-REGIME NOISE FLOOR AT n=5 IS 0.2196 PCT, 2.88x tighter than the slow-regime figure the campaign had been judging against. The 0.042-1.574 pct range of past n=2 control brackets was tail sampling, not resolving power. Most of the floor is within-process jitter."
+    },
+    {
+      "id": "C37",
+      "provenance": "verified",
+      "evidence": "Iteration 17 c17-d4s4-r1/r2/r3 = 10316.342541 / 10272.199213 / 10312.991579, median 10312.991579, spread 0.4280 pct, +1.0422 pct over the five-row floor median 10206.615573 (4.7x the 0.2196 pct floor); d4s4 min 10272.199 exceeds floor max 10220.352 by 0.507 pct so the populations are disjoint. sync_wait falls 0.08-0.10 -> 0.03-0.05 pct of span (~0.07 s per 133 s job) against a 1.04 pct gain; read_s falls 131.26-131.73 -> 129.79-131.09 s. d4s4 within-row read spread median 0.7466 pct vs the floor rows' 0.1674 pct. ITERATION 18 INTERLEAVED: ARM A 10205.165907/10203.732687/10196.104475 (median 10203.732687, spread 0.0888 pct, monotone decreasing); ARM B 10325.169594/10345.526695/10326.326340 (median 10326.326340, spread 0.1971 pct). ARM A median reproduces iteration 17's independent floor median to 0.0282 pct across sessions.",
+      "claim": "--depth 4 --sync-every 4 IS THE CHAMPION at 10326.326340 STEADY5_GB, established by a strictly alternated A/B/A/B/A/B design: median-of-medians +1.2015 pct, mean-of-means +1.2809 pct, paired differences +1.1759/+1.3896/+1.2772 pct all clearing 1 pct individually, populations disjoint by 120 GB, both arm spreads below the 0.2196 pct floor. 2.538x the origin and 93.9 pct of the read roof. The iteration-17 block-design objection is answered in the OPPOSITE direction: the baseline drifts downward, so the block design understated rather than inflated. Mechanism still unexplained -- the sync_wait it removes is ~20x too small and the gain is in read_s."
+    },
+    {
+      "id": "C38",
+      "provenance": "verified",
+      "evidence": "Iteration 19, alternated under numactl --interleave=all at --convert-threads 8. Champion arm 10323.151334/10317.199533/10327.123473 (median 10323.151334, spread 0.0961 pct). Paired differences: d6s4 -0.8165 pct, d4s8 -2.8928 pct, d6s8 -3.7986 pct; additivity -0.8165 + -2.8928 = -3.709 predicted vs -3.7986 observed. sync_wait as pct of span falls 0.045 -> 0.033 (job 0) and 0.026 -> 0.015 (job 1) going from sync-every 4 to 8 while throughput falls 2.89 pct. read_wait_s exactly 0.000000 in all 18 jobs; read_s rises 129.5-130.7 -> 131.0-132.1 -> 133.9-135.6 -> 135.2-136.6 s.",
+      "claim": "--depth 4 --sync-every 4 is a LOCAL OPTIMUM, a peak: depth 6 costs 0.82 pct, sync-every 8 costs 2.89 pct, and the two penalties are additive to within 0.09 pct. AND sync_wait IS FALSIFIED AS THE MECHANISM -- halving it again makes throughput worse, so it moves in the same direction as the metric and cannot be the cause. The entire difference lives in read_s with the reader never starved. The mechanism of the d4s4 gain remains unknown."
+    },
+    {
+      "id": "C39",
+      "provenance": "verified",
+      "evidence": "Iterations 18-20 alternated under numactl --interleave=all at --convert-threads 8. Depth axis at sync-every 4, pct vs d4s4: depth 2 -0.51 (iter16, weak), depth 3 -0.14 to -0.28 (ambiguous), depth 4 reference, depth 5 -0.01/+0.03 (clean NULL), depth 6 -0.82. Sync-every axis at depth 4: s1 +0.09 (ESTIMATE ONLY, cross-iteration), s3 -0.544, s4 reference, s8 -2.89. Champion arm iteration 20: 10335.639/10317.269/10320.801, median 10320.801, spread 0.1780 pct.",
+      "claim": "The knob optimum is fully mapped. --sync-every 4 is a SHARP optimum (-0.54 pct at 3, -2.89 pct at 8). --depth is a FLAT TOP spanning 3, 4 and 5 (all NULLs against each other) with cliffs at 2 (-0.69 pct) and 6 (-0.82 pct). Depth 4 is kept because 3 and 5 tie it and 5 costs more staging. The 2x2 factorial d2s1/d2s4/d4s1/d4s4 is complete with every cell a same-iteration alternated measurement; the iteration-15 d4s1 cross-iteration estimate of +0.09 pct was overturned by measurement at -1.1240 pct."
+    },
+    {
+      "id": "C40",
+      "provenance": "verified",
+      "evidence": "Iteration 20: sync_wait is flat to the millisecond across depth 3/4/5 (0.0347-0.0602 s, job-position-matched within 1 ms) while read_s moves up to 0.55 s; d4s3 is the first row where sync_wait RISES (+0.007 to +0.010 s = 0.008 pct) against a 0.544 pct loss; wire_pool_pin_s rises monotonically with depth (2.224 to 2.731 s) while throughput does not fall, and d5 has the highest pin cost of any row and ties the champion. Iteration 19: sync_wait fell while throughput fell. read_wait_s exactly 0.000000 in all 18 jobs of both iterations.",
+      "claim": "The mechanism of the depth/sync-every effect is NOT sync_wait (now excluded in both directions, and two orders of magnitude too small either way) and NOT pin cost (positively excluded by d5). 100 pct of every measured difference lives in read_s with the reader never starved. The mechanism remains unknown after three iterations of trying to name it."
+    },
+    {
+      "id": "C41",
+      "provenance": "verified",
+      "evidence": "Iteration 21 completed 2x2, all cells same-iteration alternated, relative to d4s4: d2s1 -1.2015 pct (iter18, n=3 vs n=3), d2s4 -0.6940 pct, d4s1 -1.1240 pct, d4s4 reference (n=3 median 10310.526019, spread 0.1010 pct). Depth 2->4 is +0.6940 pct at sync-every 4 and +0.0775 pct at sync-every 1; sync-every 1->4 is +1.1240 pct at depth 4 and +0.5075 pct at depth 2. Interaction 0.6940-0.0775 = 1.1240-0.5075 = 0.6165 pct, identical down both paths. Naive additive prediction +1.8180 pct vs actual +1.2015 pct.",
+      "claim": "--depth and --sync-every are NOT additive at the optimum: they INTERACT with a +0.6165 pct term and only pay together. Deep buffering with per-block syncing buys essentially nothing (+0.08 pct); coarse syncing with shallow buffering buys less than half its potential (+0.51 pct). This reconciles with iteration 19's far-field additivity -- additivity is a property of the tails, not the peak -- and it retires the campaign's earlier framing of the champion as 'depth 4 beats depth 2'. The interaction is OVER-DETERMINED: computable two ways, agreeing to four decimals."
+    }
+  ]
+}
