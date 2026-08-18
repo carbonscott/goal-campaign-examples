@@ -4,15 +4,15 @@ Examples of goal-campaign contracts and the prompts that produced them.
 
 ## Recommendation
 
-Use `/make-goal` **in plan mode** to create campaign contracts. Plan mode keeps the
-interview from turning into premature edits, so the contract gets fully specified
-before anything runs.
+Use `/make-goal` **in plan mode** to create campaign contracts.
 
-Running it there also leverages plan mode's own planning workflow — the codebase
-research and design pass that plan mode runs — so the contract is grounded in what
-the repo actually looks like rather than in the interview alone.
+Plan mode brings its own planning workflow — parallel exploration of the codebase
+and a design pass — and `/make-goal` gets to use it. That makes the contract more
+resourceful: it pulls in what's actually available (existing code, data, tools,
+prior runs) and folds it in where it makes sense, instead of only encoding what
+came up in the interview.
 
-(Fable may not need plan mode — it tends to hold the interview without it.)
+(Fable may not need plan mode — it tends to be resourceful on its own.)
 
 ## Layout
 
