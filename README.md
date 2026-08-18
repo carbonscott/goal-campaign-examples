@@ -8,6 +8,10 @@ Use `/make-goal` **in plan mode** to create campaign contracts. Plan mode keeps 
 interview from turning into premature edits, so the contract gets fully specified
 before anything runs.
 
+Running it there also leverages plan mode's own planning workflow — the codebase
+research and design pass that plan mode runs — so the contract is grounded in what
+the repo actually looks like rather than in the interview alone.
+
 (Fable may not need plan mode — it tends to hold the interview without it.)
 
 ## Layout
