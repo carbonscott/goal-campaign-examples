@@ -69,6 +69,8 @@ The files, and what each is for:
 
 | File | Role |
 |---|---|
+| `prompt-1-make-goal.md` | The human prompt that authored the campaign: the goal, the environment to discover, and a delegation-guard block for catching stalled subagents |
+| `prompt-2-launch.md` | The human prompt that approved the contract and launched it, with the last adjustments (uv, a setup phase, 1–3 implementers, a bridge-session cap) |
 | `*.json` (contract) | The goal, its context, the operating mode, `done_when`, guardrails, and bound |
 | `*.goal_cast.json` | The campaign-specific cast, derived from the generic one |
 | `*.setup.json` | Standing facts about the environment — hardware, storage tiers, Slurm, the harness — each tagged VERIFIED or INHERITED |
