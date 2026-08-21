@@ -1,5 +1,5 @@
 <!-- goal-cast — reusable two-role cast for a /goal campaign whose shape
-     is "beat the current best record". 1–3 workers each implement a new
+     is "beat the current best record". Workers each implement a new
      candidate solution, one worker runs them all and reports real measured
      results.
      Compared with advisor-worker.goal_cast.md in this directory: no
@@ -11,10 +11,12 @@
      tool over the Agent tool" in the prompt whenever an effort="..." is
      used — the Agent tool takes model overrides only; reasoning effort is
      settable only through Workflow.
-     Numbers below assume: 2–4 delegations per iteration (1–3 implementers
-     plus exactly one runner), at least 3 iterations, stop after 9 turns,
-     claims file on. Adjust the budget block if the host contract's defaults
-     differ.
+     Numbers below assume the count slots as shipped: 2–4 delegations per
+     iteration (1–3 implementers plus exactly one runner), at least 3
+     iterations, stop after 9 turns, claims file on. Those slots are the
+     authority on how many agents run — change one and this paragraph is the
+     only other place that needs updating. Adjust them if the host contract's
+     delegation budget differs.
      Read top to bottom, the same rules — commit, SHA, champion — recur in
      several blocks. That is deliberate: each agent receives only its own
      block, so a rule it must follow has to appear there. The whole contract
@@ -215,20 +217,22 @@ iteration, agent and commit SHA.
 </scoreboard>
 
 <budget>
-Delegate 2–4 subagents per iteration — 1 to 3 implementers plus exactly one
-runner — unless the contract that embeds this cast states otherwise. The
-runner is never dropped and never duplicated: a second runner buys nothing
-but a contended resource and an unshared control.
+An iteration is exactly one runner plus however many implementers the
+implementer block's `count` slot allows — unless the contract that embeds
+this cast states otherwise. That slot is the authority on the number;
+nothing here restates it. The runner is never dropped and never duplicated:
+a second runner buys nothing but a contended resource and an unshared
+control.
 
-Choosing the implementer count: one per independent candidate. Use 1 when
-the next move is obvious or the candidates would touch the same files; use
-2–3 only when the candidates rest on genuinely different mechanisms and each
-implementer can work in its own git worktree. Anything else you delegate
-this iteration counts toward the same 2–4, so it comes out of the
-implementers' share. Spend the extra implementers on breadth only when the
-ledger shows the next move is genuinely uncertain; one well-aimed candidate
-beats three hedged ones, and a wide iteration you cannot measure cleanly is
-worse than a narrow one you can.
+Choosing the implementer count: one per independent candidate. Use the low
+end when the next move is obvious or the candidates would touch the same
+files; use the high end only when the candidates rest on genuinely different
+mechanisms and each implementer can work in its own git worktree. Anything
+else you delegate this iteration comes out of the implementers' share, since
+the runner's slot is fixed. Spend the extra implementers on breadth only
+when the ledger shows the next move is genuinely uncertain; one well-aimed
+candidate beats several hedged ones, and a wide iteration you cannot measure
+cleanly is worse than a narrow one you can.
 </budget>
 
 </goal-cast>
