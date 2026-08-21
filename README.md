@@ -16,7 +16,7 @@ instead of only encoding what came up in the interview.
 
 ## Layout
 
-- `goal-cast/` — goal-cast templates (advisor/worker, implementer/runner)
+- `goal-cast/` — goal-cast templates (advisor/worker, implementer/runner, reviewer/fixer)
 - `optimize-throughput/` — a worked campaign: the prompts, the contract, and the ledger/claims/scoreboard it produced
 - `delegation-guard.md` — prompt template for guarding delegation
 
