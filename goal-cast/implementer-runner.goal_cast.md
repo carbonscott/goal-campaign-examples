@@ -5,6 +5,12 @@
      Compared with advisor-worker.goal_cast.md in this directory: no
      planner, no skeptic, no cold reader — the orchestrator absorbs the
      pre-belief verification duty itself.
+     Compared with actor-judge.goal_cast.md: same skeleton with the JUDGE
+     responsibility held by a measurement instead of a model, and GATE
+     fused into the runner. Its outer-loop variant — evolve a prompt template
+     across a fixed task set — is this cast unchanged: the candidate is a
+     template, the runner executes the inner refinement loop per task and
+     reports the mean judge score, and a held-out task set is the control.
      Usage: paste the block below into a /make-goal prompt, after your goal
      description. Fill the [slots]; a single value inside brackets is the
      recommended default, not an unfilled blank. Keep "prefer the Workflow
